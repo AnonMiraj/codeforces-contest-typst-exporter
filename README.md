@@ -1,26 +1,20 @@
 # Codeforces: Export All Problems to Typst
 
-This userscript exports all problems from a Codeforces contest (regular, group, or gym) into a Typst document (`.typ`). It adds "📥 Download .typ" and "📋 Copy to Clipboard" buttons to contest pages.
+This userscript exports all problems from a Codeforces contest (regular, group, or gym) into a Typst document. It adds **📥 Download .typ** and **📄 Download PDF** buttons to contest pages.
 
-This script replaces the previous [Codeforces Contest PDF Exporter](https://github.com/AnonMiraj/codeforces-contest-pdf-exporter). It uses Typst for better layout control and formula rendering.
-
-## Requirements
-
-You must install [Typst](https://typst.app/) locally to compile the downloaded `.typ` files into PDFs.
+- **Download .typ** — generates a self-contained `.typ` file with base64-encoded images. Compile offline with the [Typst CLI](https://typst.app/).
+- **Download PDF** — compiles to PDF in-browser via WebAssembly ([typst.ts](https://github.com/Myriad-Dreamin/typst.ts)). No local Typst installation needed. WASM modules are downloaded on first use.
 
 ## Installation
 
-1. Install a userscript manager like [Violentmonkey](https://violentmonkey.github.io/) or Tampermonkey.
+1. Install a userscript manager like [Violentmonkey](https://violentmonkey.github.io/).
 2. Add `script.js` to your userscript manager.
 
 ## Usage
 
 1. Open any Codeforces contest page.
-2. Click the **📥 Download .typ** button.
-3. Run this command in your terminal to generate the PDF:
-   ```bash
-   typst compile <downloaded_file>.typ
-   ```
+2. Click **📥 Download .typ** or **📄 Download PDF**.
+
 
 ## License
 

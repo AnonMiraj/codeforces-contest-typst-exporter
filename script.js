@@ -8,10 +8,10 @@
 // @match        https://codeforces.com/gym/*
 // @match        https://codeforces.com/contest/*
 // @grant        GM_xmlhttpRequest
-// @grant        GM_setClipboard
+// @grant        unsafeWindow
 // @connect      *
 // @esversion    11
-// @version      4.0
+// @version      5.0
 // ==/UserScript==
 
 (function() {
@@ -25,6 +25,9 @@
 
   if (!container) return;
 
+  const LIB_TYP_URL = 'https://github.com/AnonMiraj/codeforces-contest-typst-exporter/raw/refs/heads/main/lib.typ';
+  let cachedLibTyp = null;
+
   const btnContainer = document.createElement(container.tagName === "UL" ? "li" : "span");
   btnContainer.style.marginLeft = "15px";
 
@@ -32,67 +35,195 @@
   downloadBtn.textContent = '📥 Download .typ';
   downloadBtn.style.cssText = 'color: #d35400; text-decoration: none; cursor: pointer; font-weight: bold; margin-right: 10px;';
 
-  const copyBtn = document.createElement('a');
-  copyBtn.textContent = '📋 Copy to Clipboard';
-  copyBtn.style.cssText = 'color: #27ae60; text-decoration: none; cursor: pointer; font-weight: bold;';
+  const pdfBtn = document.createElement('a');
+  pdfBtn.textContent = '📄 Download PDF';
+  pdfBtn.style.cssText = 'color: #1a5276; text-decoration: none; cursor: pointer; font-weight: bold;';
 
   btnContainer.appendChild(downloadBtn);
-  btnContainer.appendChild(copyBtn);
+  btnContainer.appendChild(pdfBtn);
   container.appendChild(btnContainer);
 
   downloadBtn.addEventListener('click', async (e) => {
     e.preventDefault();
-    await handleAction('download', downloadBtn, copyBtn);
+    await handleTypDownload(downloadBtn);
   });
 
-  copyBtn.addEventListener('click', async (e) => {
+  pdfBtn.addEventListener('click', async (e) => {
     e.preventDefault();
-    await handleAction('copy', downloadBtn, copyBtn);
+    await handlePdfDownload(pdfBtn);
   });
 
-  async function handleAction(action, btnPrimary, btnSecondary) {
-    const originalText = btnPrimary.textContent;
-    const originalSecondaryText = btnSecondary.textContent;
+  async function fetchLibTyp() {
+    if (cachedLibTyp) return cachedLibTyp;
+    return new Promise((resolve, reject) => {
+      GM_xmlhttpRequest({
+        method: "GET",
+        url: LIB_TYP_URL,
+        responseType: "text",
+        onload: (response) => {
+          if (response.status !== 200) {
+            reject(new Error(`Failed to fetch lib.typ (HTTP ${response.status})`));
+            return;
+          }
+          cachedLibTyp = response.responseText;
+          resolve(cachedLibTyp);
+        },
+        onerror: () => reject(new Error('Failed to fetch lib.typ'))
+      });
+    });
+  }
 
-    btnPrimary.style.pointerEvents = 'none';
-    btnSecondary.style.pointerEvents = 'none';
-    btnPrimary.textContent = 'Fetching...';
+  async function fetchImageArrayBuffer(url) {
+    return new Promise((resolve, reject) => {
+      GM_xmlhttpRequest({
+        method: "GET",
+        url: url,
+        responseType: "arraybuffer",
+        onload: (response) => {
+          if (response.status !== 200) {
+            reject(new Error(`HTTP error ${response.status}`));
+            return;
+          }
+          resolve(response.response);
+        },
+        onerror: (err) => reject(err)
+      });
+    });
+  }
+
+  function arrayBufferToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+
+  async function step(name, fn) {
+    try {
+      return await fn();
+    } catch (err) {
+      const wrapped = err instanceof Error ? err : new Error(String(err));
+      wrapped.step = name;
+      throw wrapped;
+    }
+  }
+
+  async function handleTypDownload(btn) {
+    const originalText = btn.textContent;
+    btn.style.pointerEvents = 'none';
+    btn.textContent = 'Fetching...';
 
     try {
       const typstSource = await generateTypstSource((progress) => {
-        btnPrimary.textContent = progress;
+        btn.textContent = progress;
       });
 
       if (!typstSource) {
         alert('No problems found or generation failed.');
-        resetUI();
+        resetBtn();
         return;
       }
 
-      if (action === 'download') {
-        const contestTitle = getContestTitle();
-        downloadFile(`${contestTitle.replace(/[^a-zA-Z0-9]/g, '_')}.typ`, typstSource);
-        btnPrimary.textContent = 'Downloaded!';
-      } else {
-        copyToClipboard(typstSource);
-        btnSecondary.textContent = 'Copied!';
-      }
+      const contestTitle = getContestTitle();
+      downloadFile(`${contestTitle.replace(/[^a-zA-Z0-9]/g, '_')}.typ`, typstSource);
+      btn.textContent = 'Downloaded!';
     } catch (err) {
       console.error(err);
-      btnPrimary.textContent = 'Error!';
+      btn.textContent = 'Error!';
     } finally {
-      setTimeout(resetUI, 2000);
+      setTimeout(resetBtn, 2000);
     }
 
-    function resetUI() {
-      btnPrimary.textContent = originalText;
-      btnSecondary.textContent = originalSecondaryText;
-      btnPrimary.style.pointerEvents = '';
-      btnSecondary.style.pointerEvents = '';
+    function resetBtn() {
+      btn.textContent = originalText;
+      btn.style.pointerEvents = '';
     }
   }
 
-  async function generateTypstSource(updateStatus) {
+  async function handlePdfDownload(btn) {
+    const originalText = btn.textContent;
+    btn.style.pointerEvents = 'none';
+
+    try {
+      const contestTitle = getContestTitle();
+
+      btn.textContent = 'Fetching problems...';
+      const { mainContent, images } = await step('generatePdfSource', () =>
+        generatePdfSource((progress) => { btn.textContent = progress; })
+      );
+      if (!mainContent) {
+        alert('No problems found or generation failed.');
+        btn.textContent = originalText;
+        btn.style.pointerEvents = '';
+        return;
+      }
+
+      btn.textContent = 'Loading compiler (first time only)...';
+      const $typst = await step('loadTypstTs', loadTypstTs);
+
+      btn.textContent = 'Rendering PDF...';
+
+      for (const [, imgData] of images) {
+        await step('mapShadow', () => $typst.mapShadow(imgData.path, new Uint8Array(imgData.arrayBuffer)));
+      }
+
+      const pdfData = await step('typst.pdf', () => $typst.pdf({ mainContent }));
+      const blob = new Blob([pdfData], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${contestTitle.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      btn.textContent = 'Downloaded!';
+    } catch (err) {
+      console.error(err);
+      btn.textContent = 'Error!';
+      alert('PDF generation failed at "' + err.step + '": ' + err.message);
+    } finally {
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.style.pointerEvents = '';
+      }, 3000);
+    }
+  }
+
+  let typstTsPromise = null;
+
+  async function loadTypstTs() {
+    const win = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
+    if (win.$typst) return win.$typst;
+    if (typstTsPromise) return typstTsPromise;
+
+    typstTsPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.type = 'module';
+      script.src = 'https://cdn.jsdelivr.net/npm/@myriaddreamin/typst-all-in-one.ts@0.7.0/dist/esm/index.js';
+      script.id = 'typst';
+      script.onload = () => {
+        const w = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
+        if (!w.$typst) {
+          reject(new Error('Typst compiler failed to initialize'));
+          return;
+        }
+        resolve(w.$typst);
+      };
+      script.onerror = () => {
+        typstTsPromise = null;
+        reject(new Error('Failed to load Typst compiler from CDN'));
+      };
+      document.head.appendChild(script);
+    });
+
+    return typstTsPromise;
+  }
+
+  function getProblemLinks() {
     const selectors = [
       'table.datatable tr td.id a',
       'table.datatable tr td.index a',
@@ -107,213 +238,18 @@
         links.push(a.href);
       }
     });
+    return links;
+  }
 
+  async function generateTypstSource(updateStatus) {
+    const links = getProblemLinks();
     if (!links.length) return null;
 
     const contestTitle = getContestTitle();
     const dateStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
-    let typstSource = `\n#import "@preview/mitex:0.2.5": *
-
-#let problem-counter = counter("problem")
-
-#let m(str) = mi(str)
-#let dm(str) = mitex("$$" + str + "$$")
-
-#let get-balloon-color(index) = {
-  let colors = (
-    "Silver",      // A
-    "Red",         // B
-    "Pink",        // C
-    "Green",       // D
-    "Purple",      // E
-    "Yellow",      // F
-    "Black",       // G
-    "White",       // H
-    "Orange",      // I
-    "Lime Green",  // J
-    "Blue",        // K
-    "Gold",        // L
-    "Light Blue",  // M
-    "Black",       // N
-    "White"        // O
-  )
-  if index < colors.len() {
-    colors.at(index)
-  } else {
-    "Unknown"
-  }
-}
-
-#let contest-layout(
-  title: "Olympiad in Informatics",
-  location: "Somewhere",
-  date: "Once upon a time",
-  body
-) = {
-  problem-counter.update(0)
-
-  set text(font: "New Computer Modern", size: 11pt, lang: "en")
-  set par(justify: true, leading: 0.65em, first-line-indent: 0pt, spacing: 1em)
-  
-  set list(indent: 1.5em, marker: ([•], [--]))
-  set enum(indent: 1.5em)
-
-  set page(
-    paper: "a4",
-    margin: (top: 2cm, bottom: 2cm, x: 2cm), 
-    
-    header: context {
-      set text(font: "New Computer Modern", size: 10pt)
-      set align(center)
-      stack(
-        dir: ttb,
-        spacing: 0.5em,
-        block[#title \\ #location, #date],
-        line(length: 100%, stroke: 0.5pt)
-      )
-    },
-
-    footer: context {
-      line(length: 100%, stroke: 0.5pt)
-      set align(center)
-      set text(font: "New Computer Modern", size: 10pt)
-      let page-num = counter(page).get().first()
-      let total-pages = counter(page).final().first()
-      [Page #page-num of #total-pages]
-    }
-  )
-
-  body
-}
-
-#let problem(
-  title: "",
-  input-file: "standard input",
-  output-file: "standard output",
-  time-limit: "1 second",      
-  memory-limit: "256 megabytes", 
-  balloon: auto,
-  points: none,
-  body
-) = {
-  pagebreak(weak: true)
-  
-  problem-counter.step()
-  
-  context {
-    let p-index = problem-counter.get().first() - 1
-    let p-letter = problem-counter.display("A")
-
-    set text(font: "New Computer Modern", weight: "bold", size: 16pt)
-    
-    block(below: 1em)[
-      Problem #p-letter. #title
-    ]
-
-    let meta-text(content) = text(font: "New Computer Modern", size: 10pt, content)
-    let meta-label(content) = text(font: "New Computer Modern", size: 10pt, content)
-
-    let row(label, value) = (
-      meta-label(label), 
-      meta-text(value)
-    )
-
-    let cells = ()
-    
-    if input-file != none {
-      cells += row("Input file:", input-file)
-    }
-    if output-file != none {
-      cells += row("Output file:", output-file)
-    }
-    if time-limit != none {
-      cells += row("Time limit:", time-limit)
-    }
-    if memory-limit != none {
-      cells += row("Memory limit:", memory-limit)
-    }
-
-    let display-balloon = if balloon == auto {
-      get-balloon-color(p-index)
-    } else {
-      balloon
-    }
-
-    if display-balloon != none {
-      cells += row("Balloon Color:", display-balloon)
-    }
-    
-    if points != none {
-      cells += row("Points:", str(points))
-    }
-
-    pad(bottom: 0.5em)[
-      #grid(
-        columns: (auto, auto),
-        column-gutter: 1.5em, 
-        row-gutter: 0.2em,
-        ..cells
-      )
-    ]
-  }
-
-  body
-}
-
-#let section-header(title) = {
-  v(0.5em)
-  block(below: 0.5em)[
-    #text(font: "New Computer Modern", weight: "bold", size: 12pt, title)
-  ]
-}
-
-#let input-spec(body) = { section-header("Input") + body }
-#let output-spec(body) = { section-header("Output") + body }
-#let note(body) = { section-header("Note") + body }
-#let scoring(body) = { section-header("Scoring") + body }
-#let interaction(body) = { section-header("Interaction") + body }
-
-#let sample(..args) = {
-  v(0.5em)
-  section-header("Example" + if args.pos().len() > 2 { "s" } else { "" })
-  
-  let header-cell(content) = block(
-    width: 100%, 
-    inset: 6pt, 
-    stroke: (bottom: 0.5pt + black),
-    fill: none,
-    align(center, text(font: "New Computer Modern", weight: "bold", size: 10pt, content))
-  )
-
-  let content-cell(content) = block(
-    width: 100%, 
-    inset: 6pt,
-    text(font: "DejaVu Sans Mono", size: 10pt, raw(block: true, content)) 
-  )
-
-  let cells = (header-cell("standard input"), header-cell("standard output"))
-  let data = args.pos()
-  
-  for i in range(0, data.len(), step: 2) {
-    let in-str = data.at(i)
-    let out-str = if i + 1 < data.len() { data.at(i + 1) } else { "" }
-    
-    cells.push(content-cell(in-str))
-    cells.push(content-cell(out-str))
-  }
-
-  block(breakable: false, width: 100%)[
-    #table(
-      columns: (1fr, 1fr),
-      inset: 0pt,
-      stroke: 0.5pt + black,
-      align: left,
-      ..cells
-    )
-  ]
-}
-\n\n`;
+    const libContent = await fetchLibTyp();
+    let typstSource = '\n' + libContent.trim() + '\n\n';
     typstSource += `#import "@preview/based:0.2.0": base64\n\n`;
 
     typstSource += `#show: contest-layout.with(\n`;
@@ -324,15 +260,47 @@
 
     for (const url of links) {
       updateStatus(`Parsing ${links.indexOf(url) + 1}/${links.length}...`);
-      const problemTypst = await fetchAndParseProblem(url);
-      if (problemTypst) {
-        typstSource += problemTypst + "\n\n";
+      const result = await fetchAndParseProblem(url, 'typst');
+      if (result) {
+        typstSource += result.source + "\n\n";
       }
     }
+
     return typstSource;
   }
 
-  async function fetchAndParseProblem(url) {
+  async function generatePdfSource(updateStatus) {
+    const links = getProblemLinks();
+    if (!links.length) return { mainContent: null, images: new Map() };
+
+    const contestTitle = getContestTitle();
+    const dateStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+
+    const libTypContent = await fetchLibTyp();
+    let mainContent = '\n' + libTypContent.trim() + '\n\n';
+    mainContent += `#show: contest-layout.with(\n`;
+    mainContent += `  title: "${escapeString(contestTitle)}",\n`;
+    mainContent += `  location: "Codeforces",\n`;
+    mainContent += `  date: "${dateStr}"\n`;
+    mainContent += `)\n\n`;
+
+    const allImages = new Map();
+
+    for (const url of links) {
+      updateStatus(`Parsing ${links.indexOf(url) + 1}/${links.length}...`);
+      const result = await fetchAndParseProblem(url, 'pdf');
+      if (result) {
+        mainContent += result.source + "\n\n";
+        for (const [imgUrl, imgData] of result.images) {
+          allImages.set(imgUrl, imgData);
+        }
+      }
+    }
+
+    return { mainContent, images: allImages };
+  }
+
+  async function fetchAndParseProblem(url, mode) {
     try {
       const res = await fetch(url);
       const txt = await res.text();
@@ -343,14 +311,17 @@
 
       const imgTags = Array.from(prob.querySelectorAll('img'));
       const imageMap = new Map();
+      let assetCounter = 0;
 
       await Promise.all(imgTags.map(async (img) => {
         let src = img.src;
         if (src.startsWith('//')) src = 'https:' + src;
 
         try {
-          const base64 = await fetchImageBase64(src);
-          imageMap.set(img.src, base64);
+          const arrayBuffer = await fetchImageArrayBuffer(src);
+          const base64 = arrayBufferToBase64(arrayBuffer);
+          const path = `/assets/img_${assetCounter++}.png`;
+          imageMap.set(img.src, { base64, arrayBuffer, path });
         } catch (e) {
           console.warn("Failed to fetch image:", src, e);
         }
@@ -370,7 +341,8 @@
       result += `  input-file: "${escapeString(inputFile)}",\n`;
       result += `  output-file: "${escapeString(outputFile)}",\n`;
       result += `  time-limit: "${escapeString(timeLimit)}",\n`;
-      result += `  memory-limit: "${escapeString(memoryLimit)}"\n`;
+      result += `  memory-limit: "${escapeString(memoryLimit)}",\n`;
+      result += `  balloon: none\n`;
       result += `)[\n`;
 
       const contentNodes = Array.from(prob.childNodes).filter(n =>
@@ -381,20 +353,20 @@
         n.className !== 'note'
       );
 
-      result += convertNodesToTypst(contentNodes, imageMap) + `\n\n`;
+      result += convertNodesToTypst(contentNodes, imageMap, mode) + `\n\n`;
 
       const inputSpec = prob.querySelector('.input-specification');
       if (inputSpec) {
         const titleNode = inputSpec.querySelector('.section-title');
         if (titleNode) titleNode.remove();
-        result += `#input-spec[\n${convertNodesToTypst(inputSpec.childNodes, imageMap)}\n]\n`;
+        result += `#input-spec[\n${convertNodesToTypst(inputSpec.childNodes, imageMap, mode)}\n]\n`;
       }
 
       const outputSpec = prob.querySelector('.output-specification');
       if (outputSpec) {
         const titleNode = outputSpec.querySelector('.section-title');
         if (titleNode) titleNode.remove();
-        result += `#output-spec[\n${convertNodesToTypst(outputSpec.childNodes, imageMap)}\n]\n`;
+        result += `#output-spec[\n${convertNodesToTypst(outputSpec.childNodes, imageMap, mode)}\n]\n`;
       }
 
       const inputs = prob.querySelectorAll('.sample-tests .input pre');
@@ -415,15 +387,15 @@
       if (note) {
         const titleNode = note.querySelector('.section-title');
         if (titleNode) titleNode.remove();
-        result += `#note[\n${convertNodesToTypst(note.childNodes, imageMap)}\n]\n`;
+        result += `#note[\n${convertNodesToTypst(note.childNodes, imageMap, mode)}\n]\n`;
       }
 
       result += `]`;
-      return result;
+      return { source: result, images: imageMap };
 
     } catch (err) {
       console.error(err);
-      return `// Failed to load ${url}`;
+      return { source: `// Failed to load ${url}`, images: new Map() };
     }
   }
 
@@ -438,31 +410,7 @@
     return clone.textContent.trim();
   }
 
-  function fetchImageBase64(url) {
-    return new Promise((resolve, reject) => {
-      GM_xmlhttpRequest({
-        method: "GET",
-        url: url,
-        responseType: "blob",
-        onload: (response) => {
-          if (response.status !== 200) {
-            reject(new Error(`HTTP error ${response.status}`));
-            return;
-          }
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            const base64Clean = reader.result.split(',')[1];
-            resolve(base64Clean);
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(response.response);
-        },
-        onerror: (err) => reject(err)
-      });
-    });
-  }
-
-  function convertNodesToTypst(nodes, imageMap) {
+  function convertNodesToTypst(nodes, imageMap, mode) {
     if (!nodes) return "";
     if (nodes instanceof NodeList || nodes instanceof HTMLCollection) nodes = Array.from(nodes);
     if (!Array.isArray(nodes)) nodes = [nodes];
@@ -492,25 +440,25 @@
 
         switch (tag) {
           case 'p':
-            out += convertNodesToTypst(node.childNodes, imageMap) + "\n\n";
+            out += convertNodesToTypst(node.childNodes, imageMap, mode) + "\n\n";
             break;
           case 'b':
           case 'strong':
-            out += ` *${convertNodesToTypst(node.childNodes, imageMap)}* `;
+            out += ` *${convertNodesToTypst(node.childNodes, imageMap, mode)}* `;
             break;
           case 'i':
           case 'em':
-            out += ` _${convertNodesToTypst(node.childNodes, imageMap)}_ `;
+            out += ` _${convertNodesToTypst(node.childNodes, imageMap, mode)}_ `;
             break;
           case 'ul':
             Array.from(node.children).forEach(li => {
-              out += ` - ${convertNodesToTypst(li.childNodes, imageMap)}\n`;
+              out += ` - ${convertNodesToTypst(li.childNodes, imageMap, mode)}\n`;
             });
             out += "\n";
             break;
           case 'ol':
             Array.from(node.children).forEach((li, idx) => {
-              out += ` + ${convertNodesToTypst(li.childNodes, imageMap)}\n`;
+              out += ` + ${convertNodesToTypst(li.childNodes, imageMap, mode)}\n`;
             });
             out += "\n";
             break;
@@ -523,18 +471,22 @@
           case 'div':
           case 'span':
           case 'center':
-            out += convertNodesToTypst(node.childNodes, imageMap);
+            out += convertNodesToTypst(node.childNodes, imageMap, mode);
             break;
           case 'img':
-            const base64 = imageMap.get(node.src);
-            if (base64) {
-              out += `\n#align(center)[#image(base64.decode("${base64}"), width: 80%)]\n`;
+            const imgData = imageMap.get(node.src);
+            if (imgData) {
+              if (mode === 'pdf') {
+                out += `\n#align(center)[#image("${imgData.path}", width: 80%)]\n`;
+              } else {
+                out += `\n#align(center)[#image(base64.decode("${imgData.base64}"), width: 80%)]\n`;
+              }
             } else {
               out += `\n// [IMAGE MISSING: ${node.src}]\n`;
             }
             break;
           default:
-            out += convertNodesToTypst(node.childNodes, imageMap);
+            out += convertNodesToTypst(node.childNodes, imageMap, mode);
         }
       }
     });
@@ -575,17 +527,6 @@
 
   function getContestTitle() {
     return document.querySelector('.contest-name a')?.textContent.trim() || document.title || "Codeforces Contest";
-  }
-
-  function copyToClipboard(text) {
-    if (typeof GM_setClipboard !== 'undefined') {
-      GM_setClipboard(text);
-    } else {
-      navigator.clipboard.writeText(text).catch(err => {
-        console.error("Clipboard write failed", err);
-        alert("Failed to copy to clipboard.");
-      });
-    }
   }
 
   function downloadFile(filename, content) {
