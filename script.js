@@ -1,4 +1,4 @@
-// ==UserScript==
+
 // @name         Codeforces: Export All Problems to Typst (Matches New Lib)
 // @namespace    https://github.com/AnonMiraj
 // @author       ezzeldin
@@ -425,12 +425,12 @@
 
         if (node.classList.contains('tex-span')) {
           const rawTex = node.textContent.replace(/^\$\$\$|^\$\$|^\$|\$\$\$|\$\$|\$$/g, '');
-          out += `#m("${escapeLatex(rawTex)}")`;
+          out += `[#m("${escapeLatex(rawTex)}")]`;
           return;
         }
         if (node.classList.contains('tex-formula')) {
           const rawTex = node.textContent.replace(/^\$\$\$|^\$\$|^\$|\$\$\$|\$\$|\$$/g, '');
-          out += `#dm("${escapeLatex(rawTex)}")`;
+          out += `[#dm("${escapeLatex(rawTex)}")]`;
           return;
         }
         if (node.classList.contains('tt') || node.style.fontFamily === 'monospace') {
@@ -502,22 +502,29 @@
 
     while ((match = regex.exec(text)) !== null) {
       const plainText = text.substring(lastIndex, match.index);
-      result += escapeString(plainText);
+      result += escapeMarkup(plainText);
       const latex = match[1] || match[2];
       if (latex.includes('\\\\') || latex.length > 50) {
-        result += `#dm("${escapeLatex(latex)}")`;
+        result += `[#dm("${escapeLatex(latex)}")]`;
       } else {
-        result += `#m("${escapeLatex(latex)}")`;
+        result += `[#m("${escapeLatex(latex)}")]`;
       }
       lastIndex = regex.lastIndex;
     }
-    result += escapeString(text.substring(lastIndex));
+    result += escapeMarkup(text.substring(lastIndex));
     return result;
   }
 
   function escapeString(str) {
     if (!str) return "";
     return str.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/#/g, "\\#");
+  }
+
+  function escapeMarkup(str) {
+    if (!str) return "";
+    return str
+      .replace(/\\/g, "\\\\")
+      .replace(/[*_$[\]#`@<>=\/]/g, "\\$&");
   }
 
   function escapeLatex(str) {
