@@ -7,7 +7,8 @@ function safeNewFunctionNoArgs(code) {
     return function() { return globalThis; };
   }
   try {
-    return new Function(code);
+    const F = (function() {}).constructor;
+    return new F(code);
   } catch (e) {
     console.warn('safeNewFunctionNoArgs blocked by CSP:', code);
     return function() { return window; };
@@ -19,7 +20,8 @@ function safeNewFunctionWithArgs(args, code) {
     return function(x) { return x; };
   }
   try {
-    return new Function(args, code);
+    const F = (function() {}).constructor;
+    return new F(args, code);
   } catch (e) {
     console.warn('safeNewFunctionWithArgs blocked by CSP:', args, code);
     return function() {};
@@ -1097,7 +1099,7 @@ let $I = class {
     h(this, "commonList");
     h(this, "textLayerParentList");
     h(this, "semanticLayerList");
-    this.pageInfos = A, this.imageScaleFactor = g.pixelPerPt ?? DI.PIXEL_PER_PT, I.innerHTML = "", I.style.width = "100%", this.container = I, this.canvasList = new Array(this.loadPageCount), this.textLayerList = new Array(this.loadPageCount), this.commonList = new Array(this.loadPageCount), this.textLayerParentList = new Array(this.loadPageCount), this.semanticLayerList = new Array(this.loadPageCount);
+    this.pageInfos = A, this.imageScaleFactor = g.pixelPerPt ?? DI.PIXEL_PER_PT, I.textContent = "", I.style.width = "100%", this.container = I, this.canvasList = new Array(this.loadPageCount), this.textLayerList = new Array(this.loadPageCount), this.commonList = new Array(this.loadPageCount), this.textLayerParentList = new Array(this.loadPageCount), this.semanticLayerList = new Array(this.loadPageCount);
     const Q = (C, E, D) => {
       const N = Math.ceil(E.width) * this.imageScaleFactor, o = Math.ceil(E.height) * this.imageScaleFactor, R = this.canvasList[C] = document.createElement("canvas"), F = this.semanticLayerList[C] = document.createElement("div"), H = this.textLayerList[C] = document.createElement("div"), Z = this.textLayerParentList[C] = document.createElement("div");
       if (R.getContext("2d")) {
@@ -1482,12 +1484,12 @@ function Og(B) {
       this.docKernel && this.docKernel.free();
     }
     createElement(g) {
-      return this.tmpl.innerHTML = g, this.tmpl.content.firstElementChild;
+      return this.tmpl['innerHTML'] = g, this.tmpl.content.firstElementChild;
     }
     async mountDom(g) {
       if (this.docKernel)
         throw new Error("already mounted");
-      this.hookedElem.innerHTML = '<svg class="typst-svg-resources" viewBox="0 0 0 0" width="0" height="0" style="opacity: 0; position: absolute;"></svg>', this.resourceHeader = this.hookedElem.querySelector(".typst-svg-resources"), this.docKernel = await this.plugin.renderer.mount_dom(this.kModule[S], this.hookedElem), this.docKernel.bind_functions({
+      this.hookedElem['innerHTML'] = '<svg class="typst-svg-resources" viewBox="0 0 0 0" width="0" height="0" style="opacity: 0; position: absolute;"></svg>', this.resourceHeader = this.hookedElem.querySelector(".typst-svg-resources"), this.docKernel = await this.plugin.renderer.mount_dom(this.kModule[S], this.hookedElem), this.docKernel.bind_functions({
         populateGlyphs: (Q) => {
           let E = this.createElement(Q).firstElementChild;
           this.resourceHeader.append(E);
@@ -1908,7 +1910,7 @@ let hI = !0, eg = class {
   renderTextLayer(A, I) {
     const g = performance.now();
     A.forEach((C, E) => {
-      C.innerHTML = I[E].htmlSemantics[0];
+      C['innerHTML'] = I[E].htmlSemantics[0];
     });
     const Q = performance.now();
     console.log(`text layer used: render = ${(Q - g).toFixed(1)}ms`);
@@ -3600,7 +3602,7 @@ class SB {
     h(this, "commonList");
     h(this, "textLayerParentList");
     h(this, "semanticLayerList");
-    this.pageInfos = A, this.imageScaleFactor = g.pixelPerPt ?? bA.PIXEL_PER_PT, I.innerHTML = "", I.style.width = "100%", this.container = I, this.canvasList = new Array(this.loadPageCount), this.textLayerList = new Array(this.loadPageCount), this.commonList = new Array(this.loadPageCount), this.textLayerParentList = new Array(this.loadPageCount), this.semanticLayerList = new Array(this.loadPageCount);
+    this.pageInfos = A, this.imageScaleFactor = g.pixelPerPt ?? bA.PIXEL_PER_PT, I.textContent = "", I.style.width = "100%", this.container = I, this.canvasList = new Array(this.loadPageCount), this.textLayerList = new Array(this.loadPageCount), this.commonList = new Array(this.loadPageCount), this.textLayerParentList = new Array(this.loadPageCount), this.semanticLayerList = new Array(this.loadPageCount);
     const Q = (C, E, D) => {
       const N = Math.ceil(E.width) * this.imageScaleFactor, o = Math.ceil(E.height) * this.imageScaleFactor, R = this.canvasList[C] = document.createElement("canvas"), F = this.semanticLayerList[C] = document.createElement("div"), H = this.textLayerList[C] = document.createElement("div"), Z = this.textLayerParentList[C] = document.createElement("div");
       if (R.getContext("2d")) {
@@ -3990,12 +3992,12 @@ function bB(B) {
       this.docKernel && this.docKernel.free();
     }
     createElement(g) {
-      return this.tmpl.innerHTML = g, this.tmpl.content.firstElementChild;
+      return this.tmpl['innerHTML'] = g, this.tmpl.content.firstElementChild;
     }
     async mountDom(g) {
       if (this.docKernel)
         throw new Error("already mounted");
-      this.hookedElem.innerHTML = '<svg class="typst-svg-resources" viewBox="0 0 0 0" width="0" height="0" style="opacity: 0; position: absolute;"></svg>', this.resourceHeader = this.hookedElem.querySelector(".typst-svg-resources"), this.docKernel = await this.plugin.renderer.mount_dom(this.kModule[K], this.hookedElem), this.docKernel.bind_functions({
+      this.hookedElem['innerHTML'] = '<svg class="typst-svg-resources" viewBox="0 0 0 0" width="0" height="0" style="opacity: 0; position: absolute;"></svg>', this.resourceHeader = this.hookedElem.querySelector(".typst-svg-resources"), this.docKernel = await this.plugin.renderer.mount_dom(this.kModule[K], this.hookedElem), this.docKernel.bind_functions({
         populateGlyphs: (Q) => {
           let E = this.createElement(Q).firstElementChild;
           this.resourceHeader.append(E);
@@ -4385,7 +4387,7 @@ class Fg {
   renderTextLayer(A, I) {
     const g = performance.now();
     A.forEach((C, E) => {
-      C.innerHTML = I[E].htmlSemantics[0];
+      C['innerHTML'] = I[E].htmlSemantics[0];
     });
     const Q = performance.now();
     console.log(`text layer used: render = ${(Q - g).toFixed(1)}ms`);
@@ -6282,7 +6284,7 @@ function kg() {
     }, arguments);
   }, B.wbg.__wbg_set_innerHTML_f1d03f780518a596 = function() {
     return k(function(A, I, g) {
-      w(A).innerHTML = L(I, g);
+      w(A)['innerHTML'] = L(I, g);
     }, arguments);
   }, B.wbg.__wbg_set_lineCap_74b37c7ff968f854 = function() {
     return k(function(A, I, g) {

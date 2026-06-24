@@ -29,12 +29,16 @@
   // Create TYP button
   const downloadBtn = document.createElement('a');
   downloadBtn.className = "cf-pdf-btn cf-pdf-btn-typ";
-  downloadBtn.innerHTML = '<span>📥 Download .typ</span>';
+  const downloadSpan = document.createElement('span');
+  downloadSpan.textContent = '📥 Download .typ';
+  downloadBtn.appendChild(downloadSpan);
   
   // Create PDF button
   const pdfBtn = document.createElement('a');
   pdfBtn.className = "cf-pdf-btn cf-pdf-btn-pdf";
-  pdfBtn.innerHTML = '<span>📄 Download PDF</span>';
+  const pdfSpan = document.createElement('span');
+  pdfSpan.textContent = '📄 Download PDF';
+  pdfBtn.appendChild(pdfSpan);
 
   btnContainer.appendChild(downloadBtn);
   btnContainer.appendChild(pdfBtn);
@@ -53,13 +57,21 @@
 
   // State utility to manage button spinner/disabled status
   function setButtonState(btn, text, loading = false) {
+    btn.textContent = '';
     if (loading) {
       btn.classList.add('disabled');
-      btn.innerHTML = `<span class="cf-pdf-spinner"></span> <span>${text}</span>`;
+      const spinner = document.createElement('span');
+      spinner.className = 'cf-pdf-spinner';
+      const spanText = document.createElement('span');
+      spanText.textContent = ` ${text}`;
+      btn.appendChild(spinner);
+      btn.appendChild(spanText);
     } else {
       btn.classList.remove('disabled');
       const isPdf = btn.classList.contains('cf-pdf-btn-pdf');
-      btn.innerHTML = isPdf ? `<span>📄 ${text}</span>` : `<span>📥 ${text}</span>`;
+      const spanText = document.createElement('span');
+      spanText.textContent = isPdf ? `📄 ${text}` : `📥 ${text}`;
+      btn.appendChild(spanText);
     }
   }
 

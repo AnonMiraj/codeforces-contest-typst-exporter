@@ -1,20 +1,44 @@
-# Codeforces: Export All Problems to Typst
+# Codeforces to PDF Exporter
 
-This userscript exports all problems from a Codeforces contest (regular, group, or gym) into a Typst document. It adds **📥 Download .typ** and **📄 Download PDF** buttons to contest pages.
+A browser extension that exports all problems from a Codeforces contest (regular, group, or gym) into a beautifully typeset PDF document locally in your browser. It injects **📥 Download .typ** and **📄 Download PDF** buttons directly into Codeforces contest pages.
 
-- **Download .typ** — generates a self-contained `.typ` file with base64-encoded images. Compile offline with the [Typst CLI](https://typst.app/).
-- **Download PDF** — compiles to PDF in-browser via WebAssembly ([typst.ts](https://github.com/Myriad-Dreamin/typst.ts)). No local Typst installation needed. WASM modules are downloaded on first use.
+- **Download .typ** — Generates a self-contained `.typ` source file with local template styling.
+- **Download PDF** — Compiles the contest problems directly to PDF in-browser using WebAssembly (via a local Typst compiler). No external Typst installation or network calls are required!
+
+---
 
 ## Installation
 
-1. Install a userscript manager like [Violentmonkey](https://violentmonkey.github.io/).
-2. Add `script.js` to your userscript manager.
+### Firefox
+
+**Download from Firefox Browser add-ons:**
+
+[![image](img/firefox-marketplace.png)](https://addons.mozilla.org/codeforces-to-pdf-exporter)
+
+---
+
+### Chromium-based Browsers (Chrome, Edge, Brave, Opera)
+
+Currently, the Chromium extension must be installed manually in Developer Mode:
+
+1. Download the latest `chromium-extension.zip` from the [Latest Releases](https://github.com/AnonMiraj/codeforces-contest-typst-exporter/releases).
+2. Extract the ZIP file to a folder on your computer.
+3. Open your browser and navigate to the Extensions page:
+   - Chrome: `chrome://extensions/`
+   - Edge: `edge://extensions/`
+4. Enable **Developer mode** (usually a toggle in the top-right corner).
+5. Click **Load unpacked** (top-left corner).
+6. Select the folder where you extracted the `chromium-extension.zip` contents.
+
+---
 
 ## Usage
 
-1. Open any Codeforces contest page.
-2. Click **📥 Download .typ** or **📄 Download PDF**.
+1. Navigate to any Codeforces contest, gym, or group contest page.
+2. Click **📥 Download .typ** or **📄 Download PDF** next to the sub-navigation menu.
+3. Confirm that the document compiles and downloads directly to your device.
 
+---
 
 ## License
 
