@@ -11,7 +11,6 @@ const SRC_DIR = path.join(__dirname, 'src');
 const DIST_DIR = path.join(__dirname, 'dist');
 const CHROMIUM_DIST = path.join(DIST_DIR, 'chromium');
 const FIREFOX_DIST = path.join(DIST_DIR, 'firefox');
-const USERSCRIPT_DIST = path.join(DIST_DIR, 'userscript');
 
 function cleanAndCreateDir(dir) {
   if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
@@ -99,7 +98,6 @@ async function build() {
   // 2. Clean and create output directories
   cleanAndCreateDir(CHROMIUM_DIST);
   cleanAndCreateDir(FIREFOX_DIST);
-  cleanAndCreateDir(USERSCRIPT_DIST);
 
   // Clean up legacy chrome folder if present
   const legacyChromeDir = path.join(DIST_DIR, 'chrome');
@@ -137,32 +135,9 @@ async function build() {
   generateIcons(CHROMIUM_DIST);
   generateIcons(FIREFOX_DIST);
 
-  // 5. Build Userscript target
-  console.log("Building Userscript target...");
-  try {
-    let template = fs.readFileSync(path.join(SRC_DIR, 'userscript.js'), 'utf8');
-    const css = fs.readFileSync(path.join(SRC_DIR, 'content.css'), 'utf8');
-    const lib = fs.readFileSync(path.join(SRC_DIR, 'lib.typ'), 'utf8');
-    const js = fs.readFileSync(path.join(SRC_DIR, 'content.js'), 'utf8');
-
-    const escape = str => str.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
-
-    template = template
-      .replace('__CSS_CONTENT__', escape(css))
-      .replace('__LIB_TYP_CONTENT__', escape(lib))
-      .replace('// __CONTENT_JS__', js);
-
-    fs.writeFileSync(path.join(USERSCRIPT_DIST, 'script.user.js'), template, 'utf8');
-    console.log(`  Created ${path.join(USERSCRIPT_DIST, 'script.user.js')}`);
-  } catch (err) {
-    console.error("  Failed to build Userscript target:", err.message);
-    process.exit(1);
-  }
-
   console.log("\nBuild finished successfully!");
   console.log(`Firefox extension:  ${FIREFOX_DIST}`);
   console.log(`Chromium extension: ${CHROMIUM_DIST}`);
-  console.log(`Userscript:         ${USERSCRIPT_DIST}/script.user.js`);
 }
 
 build();

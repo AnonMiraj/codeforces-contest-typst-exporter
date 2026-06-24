@@ -30,7 +30,6 @@ jobs:
         run: |
           cd dist/chromium && zip -r ../chromium-extension.zip * && cd ../..
           cd dist/firefox && zip -r ../firefox-extension.zip * && cd ../..
-          cp dist/userscript/script.user.js dist/codeforces-typst-exporter.user.js
 
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v2
@@ -38,6 +37,5 @@ jobs:
           files: |
             dist/chromium-extension.zip
             dist/firefox-extension.zip
-            dist/codeforces-typst-exporter.user.js
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
