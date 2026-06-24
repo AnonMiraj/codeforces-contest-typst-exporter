@@ -1,0 +1,83 @@
+/* Premium styling for Codeforces Exporter buttons */
+
+.cf-pdf-btn-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  vertical-align: middle;
+}
+
+/* Base style for both links */
+.cf-pdf-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: bold;
+  text-decoration: none !important;
+  cursor: pointer;
+  user-select: none;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  transform: none !important;
+  transition: opacity 0.2s ease;
+}
+
+/* TYP button: Codeforces Orange theme */
+.cf-pdf-btn-typ {
+  color: #d35400 !important;
+  margin-right: 10px;
+}
+
+.cf-pdf-btn-typ:hover {
+  opacity: 0.8;
+  text-decoration: underline !important;
+}
+
+/* PDF button: Dark Blue theme */
+.cf-pdf-btn-pdf {
+  color: #1a5276 !important;
+}
+
+.cf-pdf-btn-pdf:hover {
+  opacity: 0.8;
+  text-decoration: underline !important;
+}
+
+/* Disabled state */
+.cf-pdf-btn.disabled {
+  pointer-events: none !important;
+  opacity: 0.6;
+  color: #7f8c8d !important;
+}
+
+/* Simple loading spinner micro-animation */
+.cf-pdf-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  animation: cf-pdf-spin 0.8s linear infinite;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.cf-pdf-btn-typ .cf-pdf-spinner {
+  border-color: rgba(211, 84, 0, 0.2);
+  border-top-color: #d35400;
+}
+
+.cf-pdf-btn-pdf .cf-pdf-spinner {
+  border-color: rgba(26, 82, 118, 0.2);
+  border-top-color: #1a5276;
+}
+
+@keyframes cf-pdf-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
