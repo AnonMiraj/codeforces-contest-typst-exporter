@@ -1,0 +1,6 @@
+.antigravitycli/
+dist/
+node_modules/
+*.pdf
+*.typ
+!lib.typ

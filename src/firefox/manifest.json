@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "Codeforces to PDF Exporter",
+  "version": "1.0.0",
+  "description": "Converts Codeforces contests and problem sheets into beautiful, typeset PDFs locally using Typst.",
+  "host_permissions": [
+    "https://packages.typst.org/*",
+    "https://cdn.jsdelivr.net/*",
+    "https://codeforces.com/*",
+    "https://*.codeforces.com/*"
+  ],
+  "background": {
+    "scripts": ["background.js"],
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://codeforces.com/contest/*",
+        "https://codeforces.com/gym/*",
+        "https://codeforces.com/group/*/contest/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    }
+  ],
+  "action": {
+    "default_icon": "icons/icon-48.png"
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
+  }
+}

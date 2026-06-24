@@ -1,0 +1,43 @@
+name: Release Exporter Targets
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    name: Build and Upload Assets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install SVG Renderer
+        run: npm install @resvg/resvg-js
+
+      - name: Build Targets
+        run: node build.js
+
+      - name: Package Distributions
+        run: |
+          cd dist/chromium && zip -r ../chromium-extension.zip * && cd ../..
+          cd dist/firefox && zip -r ../firefox-extension.zip * && cd ../..
+          cp dist/userscript/script.user.js dist/codeforces-typst-exporter.user.js
+
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/chromium-extension.zip
+            dist/firefox-extension.zip
+            dist/codeforces-typst-exporter.user.js
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
