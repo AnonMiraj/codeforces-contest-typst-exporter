@@ -75,6 +75,21 @@
   border-top-color: #1a5276;
 }
 
+/* Debug button: Crimson/Red theme */
+.cf-pdf-btn-debug {
+  color: #c0392b !important;
+}
+
+.cf-pdf-btn-debug:hover {
+  opacity: 0.8;
+  text-decoration: underline !important;
+}
+
+.cf-pdf-btn-debug .cf-pdf-spinner {
+  border-color: rgba(192, 57, 43, 0.2);
+  border-top-color: #c0392b;
+}
+
 @keyframes cf-pdf-spin {
   to {
     transform: rotate(360deg);

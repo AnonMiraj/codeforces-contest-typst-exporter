@@ -11,6 +11,8 @@ const SRC_DIR = path.join(__dirname, 'src');
 const DIST_DIR = path.join(__dirname, 'dist');
 const CHROMIUM_DIST = path.join(DIST_DIR, 'chromium');
 const FIREFOX_DIST = path.join(DIST_DIR, 'firefox');
+const CHROMIUM_DEBUG_DIST = path.join(DIST_DIR, 'chromium-debug');
+const FIREFOX_DEBUG_DIST = path.join(DIST_DIR, 'firefox-debug');
 
 function cleanAndCreateDir(dir) {
   if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
@@ -85,6 +87,18 @@ function generateIcons(distPath) {
   }
 }
 
+function makeDebugContentJs(destContentJs) {
+  let content = fs.readFileSync(destContentJs, 'utf8');
+  content = content.replace('const IS_DEBUG = false;', 'const IS_DEBUG = true;');
+  fs.writeFileSync(destContentJs, content, 'utf8');
+}
+
+function makeDebugManifestJson(destManifest) {
+  const manifest = JSON.parse(fs.readFileSync(destManifest, 'utf8'));
+  manifest.name = `${manifest.name} (Debug)`;
+  fs.writeFileSync(destManifest, JSON.stringify(manifest, null, 2), 'utf8');
+}
+
 async function build() {
   console.log("Starting build process...");
 
@@ -98,6 +112,8 @@ async function build() {
   // 2. Clean and create output directories
   cleanAndCreateDir(CHROMIUM_DIST);
   cleanAndCreateDir(FIREFOX_DIST);
+  cleanAndCreateDir(CHROMIUM_DEBUG_DIST);
+  cleanAndCreateDir(FIREFOX_DEBUG_DIST);
 
   // Clean up legacy chrome folder if present
   const legacyChromeDir = path.join(DIST_DIR, 'chrome');
@@ -112,32 +128,53 @@ async function build() {
   ];
 
   const copies = [
-    // Shared files -> Chromium and Firefox
+    // Shared files -> Standard and Debug targets
     ...sharedFiles.flatMap(file => [
       [file, path.join(CHROMIUM_DIST, file)],
-      [file, path.join(FIREFOX_DIST, file)]
+      [file, path.join(FIREFOX_DIST, file)],
+      [file, path.join(CHROMIUM_DEBUG_DIST, file)],
+      [file, path.join(FIREFOX_DEBUG_DIST, file)]
     ]),
-    // Chromium specific
+    // Chromium specific (standard)
     ['chrome/manifest.json', path.join(CHROMIUM_DIST, 'manifest.json')],
     ['chrome/background.js', path.join(CHROMIUM_DIST, 'background.js')],
     ['chrome/offscreen.html', path.join(CHROMIUM_DIST, 'offscreen.html')],
     ['chrome/offscreen.js', path.join(CHROMIUM_DIST, 'offscreen.js')],
-    // Firefox specific
+    // Chromium specific (debug)
+    ['chrome/manifest.json', path.join(CHROMIUM_DEBUG_DIST, 'manifest.json')],
+    ['chrome/background.js', path.join(CHROMIUM_DEBUG_DIST, 'background.js')],
+    ['chrome/offscreen.html', path.join(CHROMIUM_DEBUG_DIST, 'offscreen.html')],
+    ['chrome/offscreen.js', path.join(CHROMIUM_DEBUG_DIST, 'offscreen.js')],
+    // Firefox specific (standard)
     ['firefox/manifest.json', path.join(FIREFOX_DIST, 'manifest.json')],
-    ['firefox/background.js', path.join(FIREFOX_DIST, 'background.js')]
+    ['firefox/background.js', path.join(FIREFOX_DIST, 'background.js')],
+    // Firefox specific (debug)
+    ['firefox/manifest.json', path.join(FIREFOX_DEBUG_DIST, 'manifest.json')],
+    ['firefox/background.js', path.join(FIREFOX_DEBUG_DIST, 'background.js')]
   ];
 
   for (const [srcRel, destAbs] of copies) {
     copyFile(path.join(SRC_DIR, srcRel), destAbs);
   }
 
-  // 4. Generate PNG icons
+  // 4. Post-process Debug targets
+  console.log("Post-processing Debug variants...");
+  makeDebugContentJs(path.join(CHROMIUM_DEBUG_DIST, 'content.js'));
+  makeDebugContentJs(path.join(FIREFOX_DEBUG_DIST, 'content.js'));
+  makeDebugManifestJson(path.join(CHROMIUM_DEBUG_DIST, 'manifest.json'));
+  makeDebugManifestJson(path.join(FIREFOX_DEBUG_DIST, 'manifest.json'));
+
+  // 5. Generate PNG icons
   generateIcons(CHROMIUM_DIST);
   generateIcons(FIREFOX_DIST);
+  generateIcons(CHROMIUM_DEBUG_DIST);
+  generateIcons(FIREFOX_DEBUG_DIST);
 
   console.log("\nBuild finished successfully!");
-  console.log(`Firefox extension:  ${FIREFOX_DIST}`);
-  console.log(`Chromium extension: ${CHROMIUM_DIST}`);
+  console.log(`Firefox extension:         ${FIREFOX_DIST}`);
+  console.log(`Firefox extension (Debug): ${FIREFOX_DEBUG_DIST}`);
+  console.log(`Chromium extension:         ${CHROMIUM_DIST}`);
+  console.log(`Chromium extension (Debug): ${CHROMIUM_DEBUG_DIST}`);
 }
 
 build();

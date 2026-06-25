@@ -33,6 +33,8 @@ jobs:
         run: |
           cd dist/chromium && zip -r ../chromium-extension.zip * && cd ../..
           cd dist/firefox && zip -r ../firefox-extension.zip * && cd ../..
+          cd dist/chromium-debug && zip -r ../chromium-extension-debug.zip * && cd ../..
+          cd dist/firefox-debug && zip -r ../firefox-extension-debug.zip * && cd ../..
 
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v2
@@ -44,5 +46,7 @@ jobs:
           files: |
             dist/chromium-extension.zip
             dist/firefox-extension.zip
+            dist/chromium-extension-debug.zip
+            dist/firefox-extension-debug.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

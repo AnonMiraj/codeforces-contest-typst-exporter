@@ -6,6 +6,44 @@
 (function() {
   'use strict';
 
+  const IS_DEBUG = false; // Will be set to true by the build script for debug variants
+  const debugLogs = [];
+  const debugHtmlStore = [];
+  const fetchCache = {};
+  const imageCache = {};
+
+  function logDebug(message) {
+    const line = `[${new Date().toISOString()}] ${message}`;
+    console.log(line);
+    debugLogs.push(line);
+  }
+
+  async function cachedFetchText(url) {
+    if (fetchCache[url]) {
+      logDebug(`HTML Fetch Cache HIT: ${url}`);
+      return fetchCache[url];
+    }
+    logDebug(`HTML Fetch Cache MISS: ${url}`);
+    const res = await fetch(url);
+    const txt = await res.text();
+    fetchCache[url] = txt;
+    if (IS_DEBUG) {
+      debugHtmlStore.push({ url, html: txt });
+    }
+    return txt;
+  }
+
+  async function cachedFetchImage(url) {
+    if (imageCache[url]) {
+      logDebug(`Image Fetch Cache HIT: ${url}`);
+      return imageCache[url].slice(0);
+    }
+    logDebug(`Image Fetch Cache MISS: ${url}`);
+    const arrayBuffer = await fetchImageArrayBuffer(url);
+    imageCache[url] = arrayBuffer;
+    return arrayBuffer.slice(0);
+  }
+
   // Ensure we are on a page containing contest/problem listings
   if (!document.querySelector('table.datatable') && !document.querySelector('table.problems')) return;
 
@@ -42,6 +80,18 @@
 
   btnContainer.appendChild(downloadBtn);
   btnContainer.appendChild(pdfBtn);
+
+  // Create Debug button if in debug mode
+  let debugBtn = null;
+  if (IS_DEBUG) {
+    debugBtn = document.createElement('a');
+    debugBtn.className = "cf-pdf-btn cf-pdf-btn-debug";
+    const debugSpan = document.createElement('span');
+    debugSpan.textContent = '🐛 Debug';
+    debugBtn.appendChild(debugSpan);
+    btnContainer.appendChild(debugBtn);
+  }
+
   container.appendChild(btnContainer);
 
   // Setup click listeners
@@ -54,6 +104,13 @@
     e.preventDefault();
     await handlePdfDownload(pdfBtn);
   });
+
+  if (IS_DEBUG && debugBtn) {
+    debugBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      await handleDebugDownload(debugBtn);
+    });
+  }
 
   // State utility to manage button spinner/disabled status
   function setButtonState(btn, text, loading = false) {
@@ -69,8 +126,15 @@
     } else {
       btn.classList.remove('disabled');
       const isPdf = btn.classList.contains('cf-pdf-btn-pdf');
+      const isDebug = btn.classList.contains('cf-pdf-btn-debug');
       const spanText = document.createElement('span');
-      spanText.textContent = isPdf ? `📄 ${text}` : `📥 ${text}`;
+      if (isPdf) {
+        spanText.textContent = `📄 ${text}`;
+      } else if (isDebug) {
+        spanText.textContent = `🐛 ${text}`;
+      } else {
+        spanText.textContent = `📥 ${text}`;
+      }
       btn.appendChild(spanText);
     }
   }
@@ -153,6 +217,95 @@
     }
   }
 
+  async function handleDebugDownload(btn) {
+    const originalText = 'Debug';
+    setButtonState(btn, 'Debugging...', true);
+
+    debugLogs.length = 0;
+    debugHtmlStore.length = 0;
+
+    logDebug(`=== Codeforces to PDF Exporter Debug Log ===`);
+    logDebug(`User Agent: ${navigator.userAgent}`);
+    logDebug(`Timestamp: ${new Date().toISOString()}`);
+    logDebug(`URL: ${window.location.href}`);
+
+    try {
+      logDebug(`Step 1: Fetching lib.typ content...`);
+      const libContent = await fetchLibTypContent();
+      logDebug(`Successfully loaded lib.typ (${libContent.length} chars)`);
+
+      logDebug(`Step 2: Generating Typst markup (.typ)...`);
+      const typstSource = await generateTypstSource(libContent, (progress) => {
+        setButtonState(btn, `Typst: ${progress}`, true);
+      });
+      logDebug(`Generated Typst source markup successfully (${typstSource ? typstSource.length : 0} chars)`);
+
+      logDebug(`Step 3: Generating PDF compilation source...`);
+      const { mainContent, images } = await generatePdfSource(libContent, (progress) => {
+        setButtonState(btn, `PDF Source: ${progress}`, true);
+      });
+      logDebug(`Generated PDF source markup successfully (${mainContent ? mainContent.length : 0} chars)`);
+      logDebug(`Collected ${images.length} images for shadow filesystem mapping`);
+
+      if (!mainContent) {
+        throw new Error('No problems parsed. Verify page DOM selectors.');
+      }
+
+      logDebug(`Step 4: Compiling PDF via background...`);
+      setButtonState(btn, 'Compiling...', true);
+      const response = await sendBackgroundMessage({
+        type: 'COMPILE_PDF',
+        mainContent,
+        images
+      });
+
+      if (!response || !response.success) {
+        throw new Error(response?.error || 'WASM compilation failed in background context.');
+      }
+      
+      const pdfBytes = new Uint8Array(response.pdfData);
+      logDebug(`WASM compilation successful. PDF size: ${pdfBytes.length} bytes`);
+
+      logDebug(`Step 5: Packaging debug ZIP archive...`);
+      setButtonState(btn, 'Packaging...', true);
+      const zip = new TinyZip();
+      
+      zip.addFile('contest.typ', typstSource || '');
+      zip.addFile('contest.pdf', pdfBytes);
+      
+      debugHtmlStore.forEach((item, index) => {
+        const problemCode = item.url.split('/').pop() || `problem_${index}`;
+        zip.addFile(`problems/${problemCode}.html`, item.html);
+      });
+
+      logDebug(`Step 6: Writing debug.log and exporting ZIP...`);
+      zip.addFile('debug.log', debugLogs.join('\n'));
+
+      const zipBytes = zip.generate();
+      logDebug(`ZIP archive generated successfully. Size: ${zipBytes.length} bytes`);
+
+      const contestTitle = getContestTitle();
+      const filename = `${contestTitle.replace(/[^a-zA-Z0-9]/g, '_')}_debug.zip`;
+      downloadFile(filename, zipBytes, 'application/zip');
+      
+      setButtonState(btn, 'Completed!', false);
+    } catch (err) {
+      logDebug(`CRITICAL ERROR during debug export: ${err.message}\nStack: ${err.stack}`);
+      try {
+        const errorZip = new TinyZip();
+        errorZip.addFile('debug.log', debugLogs.join('\n'));
+        const errZipBytes = errorZip.generate();
+        downloadFile('cf_exporter_debug_error_log.zip', errZipBytes, 'application/zip');
+      } catch (zipErr) {
+        console.error("Failed to export error log zip:", zipErr);
+      }
+      setButtonState(btn, 'Failed!', false);
+      alert('Debug export failed. Check downloaded error log zip. Error: ' + err.message);
+    } finally {
+      setTimeout(() => setButtonState(btn, originalText, false), 3000);
+    }
+  }
+
   // Helper to send messages to background with debugging and custom timeout / errors
   async function sendBackgroundMessage(message) {
     if (typeof window !== 'undefined' && typeof window.sendBackgroundMessageMock === 'function') {
@@ -220,8 +373,13 @@
   }
 
   async function generateTypstSource(libContent, updateStatus) {
+    logDebug(`generateTypstSource: Retrieving problem links...`);
     const links = getProblemLinks();
-    if (!links.length) return null;
+    if (!links.length) {
+      logDebug(`ERROR: No problem links found on this page.`);
+      return null;
+    }
+    logDebug(`Found ${links.length} problem links: ${links.join(', ')}`);
 
     const contestTitle = getContestTitle();
     const dateStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -236,6 +394,7 @@
     typstSource += `)\n\n`;
 
     for (const url of links) {
+      logDebug(`generateTypstSource: Processing ${links.indexOf(url) + 1}/${links.length} (${url})...`);
       updateStatus(`Parsing ${links.indexOf(url) + 1}/${links.length}...`);
       const result = await fetchAndParseProblem(url, 'typst');
       if (result) {
@@ -243,12 +402,18 @@
       }
     }
 
+    logDebug(`generateTypstSource: Completed Typst markup generation.`);
     return typstSource;
   }
 
   async function generatePdfSource(libContent, updateStatus) {
+    logDebug(`generatePdfSource: Retrieving problem links...`);
     const links = getProblemLinks();
-    if (!links.length) return { mainContent: null, images: [] };
+    if (!links.length) {
+      logDebug(`ERROR: No problem links found on this page.`);
+      return { mainContent: null, images: [] };
+    }
+    logDebug(`Found ${links.length} problem links: ${links.join(', ')}`);
 
     const contestTitle = getContestTitle();
     const dateStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -264,6 +429,7 @@
     const seenImagePaths = new Set();
 
     for (const url of links) {
+      logDebug(`generatePdfSource: Processing ${links.indexOf(url) + 1}/${links.length} (${url})...`);
       updateStatus(`Parsing ${links.indexOf(url) + 1}/${links.length}...`);
       const result = await fetchAndParseProblem(url, 'pdf');
       if (result) {
@@ -280,17 +446,22 @@
       }
     }
 
+    logDebug(`generatePdfSource: Completed PDF markup generation. Mapped ${allImages.length} unique images.`);
     return { mainContent, images: allImages };
   }
 
   async function fetchAndParseProblem(url, mode) {
     try {
-      const res = await fetch(url);
-      const txt = await res.text();
+      const txt = await cachedFetchText(url);
       const doc = new DOMParser().parseFromString(txt, 'text/html');
       const prob = doc.querySelector('.problem-statement');
 
-      if (!prob) return null;
+      if (!prob) {
+        logDebug(`WARNING: Element .problem-statement not found for ${url}`);
+        return null;
+      }
+
+      logDebug(`Parsing problem statement for ${url}. Title: ${prob.querySelector('.header .title')?.textContent.trim() || 'Unknown'}`);
 
       const imgTags = Array.from(prob.querySelectorAll('img'));
       const imageList = [];
@@ -301,7 +472,7 @@
         if (src.startsWith('//')) src = 'https:' + src;
 
         try {
-          const arrayBuffer = await fetchImageArrayBuffer(src);
+          const arrayBuffer = await cachedFetchImage(src);
           const path = `/assets/img_${url.split('/').pop()}_${assetCounter++}.png`;
           
           let base64 = null;
@@ -310,9 +481,10 @@
           }
           
           imageList.push({ src: img.src, base64, arrayBuffer, path });
-          // Update the DOM node's src so that we can find it in mapping
           img.setAttribute('data-target-path', path);
+          logDebug(`Successfully fetched and mapped image: ${src} -> ${path} (${arrayBuffer.byteLength} bytes)`);
         } catch (e) {
+          logDebug(`ERROR: Failed to fetch image: ${src}. Error: ${e.message}`);
           console.warn("Failed to fetch image:", src, e);
         }
       }));
@@ -537,5 +709,121 @@
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(a.href);
+  }
+  // CRC-32 checksum calculator
+  function crc32(data) {
+    const table = new Uint32Array(256);
+    for (let i = 0; i < 256; i++) {
+      let c = i;
+      for (let j = 0; j < 8; j++) {
+        c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      }
+      table[i] = c;
+    }
+    let crc = 0 ^ (-1);
+    for (let i = 0; i < data.length; i++) {
+      crc = (crc >>> 8) ^ table[(crc ^ data[i]) & 0xFF];
+    }
+    return (crc ^ (-1)) >>> 0;
+  }
+
+  // Tiny store-only ZIP writer (no compression, method 0)
+  class TinyZip {
+    constructor() {
+      this.files = [];
+    }
+    
+    addFile(name, content) {
+      const encoder = new TextEncoder();
+      const data = typeof content === 'string' ? encoder.encode(content) : new Uint8Array(content);
+      this.files.push({ name, data });
+    }
+    
+    generate() {
+      let offset = 0;
+      const encoder = new TextEncoder();
+      const preparedFiles = this.files.map(f => {
+        const nameBuf = encoder.encode(f.name);
+        const crc = crc32(f.data);
+        return {
+          name: f.name,
+          nameBuf,
+          data: f.data,
+          crc,
+          size: f.data.length
+        };
+      });
+      
+      preparedFiles.forEach(f => {
+        f.offset = offset;
+        offset += 30 + f.nameBuf.length + f.size;
+      });
+      
+      const localHeadersSize = offset;
+      let centralDirectorySize = 0;
+      preparedFiles.forEach(f => {
+        centralDirectorySize += 46 + f.nameBuf.length;
+      });
+      
+      const totalSize = localHeadersSize + centralDirectorySize + 22;
+      const out = new Uint8Array(totalSize);
+      const view = new DataView(out.buffer);
+      
+      let pos = 0;
+      
+      // Write Local Headers and File Data
+      preparedFiles.forEach(f => {
+        view.setUint32(pos, 0x04034b50, true); pos += 4; // Local header signature
+        view.setUint16(pos, 10, true); pos += 2;          // Version needed
+        view.setUint16(pos, 0, true); pos += 2;           // General flags
+        view.setUint16(pos, 0, true); pos += 2;           // Store method (0)
+        view.setUint16(pos, 0, true); pos += 2;           // Mod time
+        view.setUint16(pos, 0, true); pos += 2;           // Mod date
+        view.setUint32(pos, f.crc, true); pos += 4;       // CRC32
+        view.setUint32(pos, f.size, true); pos += 4;      // Compressed size
+        view.setUint32(pos, f.size, true); pos += 4;      // Uncompressed size
+        view.setUint16(pos, f.nameBuf.length, true); pos += 2; // Filename length
+        view.setUint16(pos, 0, true); pos += 2;           // Extra field length
+        
+        out.set(f.nameBuf, pos); pos += f.nameBuf.length;
+        out.set(f.data, pos); pos += f.size;
+      });
+      
+      // Write Central Directory Headers
+      const cdOffset = pos;
+      preparedFiles.forEach(f => {
+        view.setUint32(pos, 0x02014b50, true); pos += 4; // Central directory signature
+        view.setUint16(pos, 20, true); pos += 2;          // Made by (2.0)
+        view.setUint16(pos, 10, true); pos += 2;          // Version needed (1.0)
+        view.setUint16(pos, 0, true); pos += 2;           // Flags
+        view.setUint16(pos, 0, true); pos += 2;           // Method
+        view.setUint16(pos, 0, true); pos += 2;           // Mod time
+        view.setUint16(pos, 0, true); pos += 2;           // Mod date
+        view.setUint32(pos, f.crc, true); pos += 4;       // CRC32
+        view.setUint32(pos, f.size, true); pos += 4;      // Compressed size
+        view.setUint32(pos, f.size, true); pos += 4;      // Uncompressed size
+        view.setUint16(pos, f.nameBuf.length, true); pos += 2; // Filename length
+        view.setUint16(pos, 0, true); pos += 2;           // Extra field length
+        view.setUint16(pos, 0, true); pos += 2;           // File comment length
+        view.setUint16(pos, 0, true); pos += 2;           // Disk start
+        view.setUint16(pos, 0, true); pos += 2;           // Internal attrs
+        view.setUint32(pos, 0, true); pos += 4;           // External attrs
+        view.setUint32(pos, f.offset, true); pos += 4;    // Offset of local header
+        
+        out.set(f.nameBuf, pos); pos += f.nameBuf.length;
+      });
+      
+      // Write End of Central Directory
+      view.setUint32(pos, 0x06054b50, true); pos += 4; // EOCD signature
+      view.setUint16(pos, 0, true); pos += 2;          // Disk number
+      view.setUint16(pos, 0, true); pos += 2;          // CD disk start
+      view.setUint16(pos, preparedFiles.length, true); pos += 2; // CD disk records
+      view.setUint16(pos, preparedFiles.length, true); pos += 2; // CD total records
+      view.setUint32(pos, cdOffset - localHeadersSize, true); pos += 4; // CD size
+      view.setUint32(pos, localHeadersSize, true); pos += 4; // CD offset
+      view.setUint16(pos, 0, true); pos += 2;          // Comment length
+      
+      return out;
+    }
   }
 })();
