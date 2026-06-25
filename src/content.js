@@ -572,6 +572,58 @@
     return clone.textContent.trim();
   }
 
+  function convertMathNodeToLatex(node) {
+    if (!node) return "";
+    let latex = "";
+    node.childNodes.forEach(child => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        latex += child.textContent;
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const tag = child.tagName.toLowerCase();
+        const isSub = (tag === 'sub' || child.classList.contains('lower-index'));
+        const isSup = (tag === 'sup' || child.classList.contains('upper-index'));
+        
+        if (isSub) {
+          const subText = convertMathNodeToLatex(child);
+          latex += `_{${subText}}`;
+        } else if (isSup) {
+          const supText = convertMathNodeToLatex(child);
+          latex += `^{${supText}}`;
+        } else {
+          latex += convertMathNodeToLatex(child);
+        }
+      }
+    });
+    
+    // Replace unicode mathematical operators and symbols with their LaTeX equivalents
+    return latex
+      .replace(/≤/g, '\\le ')
+      .replace(/≥/g, '\\ge ')
+      .replace(/≠/g, '\\ne ')
+      .replace(/ /g, ' ') // thin space
+      .replace(/ /g, ' ') // non-breaking space
+      .replace(/−/g, '-')  // unicode minus
+      .replace(/·/g, '\\cdot ')
+      .replace(/×/g, '\\times ')
+      .replace(/±/g, '\\pm ')
+      .replace(/÷/g, '\\div ')
+      .replace(/≈/g, '\\approx ')
+      .replace(/≡/g, '\\equiv ')
+      .replace(/∞/g, '\\infty ')
+      .replace(/…/g, '\\dots ')
+      .replace(/α/g, '\\alpha ')
+      .replace(/β/g, '\\beta ')
+      .replace(/γ/g, '\\gamma ')
+      .replace(/δ/g, '\\delta ')
+      .replace(/ε/g, '\\epsilon ')
+      .replace(/θ/g, '\\theta ')
+      .replace(/λ/g, '\\lambda ')
+      .replace(/μ/g, '\\mu ')
+      .replace(/π/g, '\\pi ')
+      .replace(/σ/g, '\\sigma ')
+      .replace(/φ/g, '\\phi ');
+  }
+
   function convertNodesToTypst(nodes, imageList, mode) {
     if (!nodes) return "";
     if (nodes instanceof NodeList || nodes instanceof HTMLCollection) nodes = Array.from(nodes);
@@ -586,14 +638,29 @@
         const tag = node.tagName.toLowerCase();
 
         if (node.classList.contains('tex-span')) {
-          const rawTex = node.textContent.replace(/^\$\$\$|^\$\$|^\$|\$\$\$|\$\$|\$$/g, '');
-          out += `[#m("${escapeLatex(rawTex)}")]`;
-          return;
+          let latex = convertMathNodeToLatex(node).trim();
+          if (latex) {
+            const rawTex = latex.replace(/^\$\$\$|^\$\$|^\$|\$\$\$|\$\$|\$$/g, ''); // Keep standard replacements clean
+            out += `#m("${escapeLatex(rawTex)}")`;
+            return;
+          }
+          if (tag !== 'img') {
+            return;
+          }
         }
         if (node.classList.contains('tex-formula')) {
-          const rawTex = node.textContent.replace(/^\$\$\$|^\$\$|^\$|\$\$\$|\$\$|\$$/g, '');
-          out += `[#dm("${escapeLatex(rawTex)}")]`;
-          return;
+          let latex = convertMathNodeToLatex(node).trim();
+          if (!latex && node.getAttribute('alt')) {
+            latex = node.getAttribute('alt').trim();
+          }
+          if (latex) {
+            const rawTex = latex.replace(/^\$\$\$|^\$\$|^\$|\$\$\$|\$\$|\$$/g, '');
+            out += `#dm("${escapeLatex(rawTex)}")`;
+            return;
+          }
+          if (tag !== 'img') {
+            return;
+          }
         }
         if (node.classList.contains('tt') || node.style.fontFamily === 'monospace') {
           out += `\`${node.textContent}\``;
@@ -669,9 +736,9 @@
       result += escapeMarkup(plainText);
       const latex = match[1] !== undefined ? match[1] : match[2];
       if (match[1] !== undefined || latex.includes('\\\\')) {
-        result += `[#dm("${escapeLatex(latex)}")]`;
+        result += `#dm("${escapeLatex(latex)}")`;
       } else {
-        result += `[#m("${escapeLatex(latex)}")]`;
+        result += `#m("${escapeLatex(latex)}")`;
       }
       lastIndex = cfMathRegex.lastIndex;
     }
