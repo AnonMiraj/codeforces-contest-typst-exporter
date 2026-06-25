@@ -10,7 +10,6 @@ function safeNewFunctionNoArgs(code) {
     const F = (function() {}).constructor;
     return new F(code);
   } catch (e) {
-    console.warn('safeNewFunctionNoArgs blocked by CSP:', code);
     return function() { return window; };
   }
 }
@@ -23,7 +22,6 @@ function safeNewFunctionWithArgs(args, code) {
     const F = (function() {}).constructor;
     return new F(args, code);
   } catch (e) {
-    console.warn('safeNewFunctionWithArgs blocked by CSP:', args, code);
     return function() {};
   }
 }
@@ -3170,7 +3168,7 @@ function Bg(B, A) {
 }
 function NB(B) {
   if (i !== void 0) return i;
-  typeof B < "u" && (Object.getPrototypeOf(B) === Object.prototype ? { module: B } = B : console.warn("using deprecated parameters for `initSync()`; pass a single object instead"));
+  typeof B < "u" && (Object.getPrototypeOf(B) === Object.prototype ? { module: B } = B : null);
   const A = gg();
   B instanceof WebAssembly.Module || (B = new WebAssembly.Module(B));
   const I = new WebAssembly.Instance(B, A);
@@ -3178,7 +3176,7 @@ function NB(B) {
 }
 async function Qg(B) {
   if (i !== void 0) return i;
-  typeof B < "u" && (Object.getPrototypeOf(B) === Object.prototype ? { module_or_path: B } = B : console.warn("using deprecated parameters for the initialization function; pass a single object instead")), typeof B > "u" && (B = Cg("typst_ts_web_compiler_bg.wasm", import.meta.url));
+  typeof B < "u" && (Object.getPrototypeOf(B) === Object.prototype ? { module_or_path: B } = B : null), typeof B > "u" && (B = Cg("typst_ts_web_compiler_bg.wasm", import.meta.url));
   const A = gg();
   (typeof B == "string" || typeof Request == "function" && B instanceof Request || typeof URL == "function" && B instanceof URL) && (B = fetch(B));
   const { instance: I, module: g } = await oB(await B, A);
@@ -6466,7 +6464,7 @@ function Yg(B, A) {
 }
 function eB(B) {
   if (G !== void 0) return G;
-  typeof B < "u" && (Object.getPrototypeOf(B) === Object.prototype ? { module: B } = B : console.warn("using deprecated parameters for `initSync()`; pass a single object instead"));
+  typeof B < "u" && (Object.getPrototypeOf(B) === Object.prototype ? { module: B } = B : null);
   const A = kg();
   B instanceof WebAssembly.Module || (B = new WebAssembly.Module(B));
   const I = new WebAssembly.Instance(B, A);
@@ -6474,7 +6472,7 @@ function eB(B) {
 }
 async function cg(B) {
   if (G !== void 0) return G;
-  typeof B < "u" && (Object.getPrototypeOf(B) === Object.prototype ? { module_or_path: B } = B : console.warn("using deprecated parameters for the initialization function; pass a single object instead")), typeof B > "u" && (B = Jg("typst_ts_renderer_bg.wasm", import.meta.url));
+  typeof B < "u" && (Object.getPrototypeOf(B) === Object.prototype ? { module_or_path: B } = B : null), typeof B > "u" && (B = Jg("typst_ts_renderer_bg.wasm", import.meta.url));
   const A = kg();
   (typeof B == "string" || typeof Request == "function" && B instanceof Request || typeof URL == "function" && B instanceof URL) && (B = fetch(B));
   const { instance: I, module: g } = await rB(await B, A);
