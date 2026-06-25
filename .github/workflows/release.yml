@@ -18,7 +18,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Install SVG Renderer
         run: npm install @resvg/resvg-js
@@ -34,6 +34,7 @@ jobs:
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.release.tag_name || github.ref_name }}
           files: |
             dist/chromium-extension.zip
             dist/firefox-extension.zip
