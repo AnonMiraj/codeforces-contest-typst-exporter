@@ -24,7 +24,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })
     .catch(err => {
       console.error("[Offscreen] Compilation failed:", err);
-      sendResponse({ success: false, error: err.message });
+      sendResponse({ success: false, error: err?.message || String(err) });
     });
 
   return true; // Keep connection open for async response

@@ -63,7 +63,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       })
       .catch(err => {
         console.error(`[Background SW] COMPILE_PDF pipeline crashed:`, err);
-        sendResponse({ success: false, error: err.message });
+        sendResponse({ success: false, error: err?.message || String(err) });
       });
     return true;
   }

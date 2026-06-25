@@ -15,6 +15,14 @@ A browser extension that exports all problems from a Codeforces contest (regular
 
 [![image](img/firefox-marketplace.png)](https://addons.mozilla.org/codeforces-to-pdf-exporter)
 
+*Note: While waiting for official store approval, you can install the extension manually:*
+
+1. Download the latest `firefox-extension.zip` from the [Latest Releases](https://github.com/AnonMiraj/codeforces-contest-typst-exporter/releases).
+2. Extract the ZIP file to a folder on your computer.
+3. Open Firefox and navigate to `about:debugging#/runtime/this-firefox`.
+4. Click **Load Temporary Add-on...**.
+5. Navigate to the extracted folder and select the **`manifest.json`** file.
+
 ---
 
 ### Chromium-based Browsers (Chrome, Edge, Brave, Opera)

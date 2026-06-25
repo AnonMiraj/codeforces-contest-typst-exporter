@@ -39,7 +39,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       })
       .catch(err => {
         console.error("Firefox background compilation failed:", err);
-        sendResponse({ success: false, error: err.message });
+        sendResponse({ success: false, error: err?.message || String(err) });
       });
     return true;
   }

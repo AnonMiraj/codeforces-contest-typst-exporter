@@ -156,7 +156,7 @@
       }
 
       const contestTitle = getContestTitle();
-      const filename = `${contestTitle.replace(/[^a-zA-Z0-9]/g, '_')}.typ`;
+      const filename = getContestFilename(contestTitle, 'typ');
       downloadFile(filename, typstSource, 'text/plain');
       setButtonState(btn, 'Downloaded!', false);
 
@@ -202,7 +202,7 @@
       // Convert response array back to Uint8Array
       const pdfBytes = new Uint8Array(response.pdfData);
       const contestTitle = getContestTitle();
-      const filename = `${contestTitle.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+      const filename = getContestFilename(contestTitle, 'pdf');
       
       downloadFile(filename, pdfBytes, 'application/pdf');
       setButtonState(btn, 'Downloaded!', false);
@@ -285,7 +285,7 @@
       logDebug(`ZIP archive generated successfully. Size: ${zipBytes.length} bytes`);
 
       const contestTitle = getContestTitle();
-      const filename = `${contestTitle.replace(/[^a-zA-Z0-9]/g, '_')}_debug.zip`;
+      const filename = getContestFilename(contestTitle + '_debug', 'zip');
       downloadFile(filename, zipBytes, 'application/zip');
       
       setButtonState(btn, 'Completed!', false);
@@ -387,9 +387,10 @@
     let typstSource = '\n' + libContent.trim() + '\n\n';
     typstSource += `#import "@preview/based:0.2.0": base64\n\n`;
 
+    const contestLocation = getContestLocation();
     typstSource += `#show: contest-layout.with(\n`;
     typstSource += `  title: "${escapeString(contestTitle)}",\n`;
-    typstSource += `  location: "Codeforces",\n`;
+    typstSource += `  location: "${escapeString(contestLocation)}",\n`;
     typstSource += `  date: "${dateStr}"\n`;
     typstSource += `)\n\n`;
 
@@ -419,9 +420,10 @@
     const dateStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
     let mainContent = '\n' + libContent.trim() + '\n\n';
+    const contestLocation = getContestLocation();
     mainContent += `#show: contest-layout.with(\n`;
     mainContent += `  title: "${escapeString(contestTitle)}",\n`;
-    mainContent += `  location: "Codeforces",\n`;
+    mainContent += `  location: "${escapeString(contestLocation)}",\n`;
     mainContent += `  date: "${dateStr}"\n`;
     mainContent += `)\n\n`;
 
@@ -641,7 +643,7 @@
           let latex = convertMathNodeToLatex(node).trim();
           if (latex) {
             const rawTex = latex.replace(/^\$\$\$|^\$\$|^\$|\$\$\$|\$\$|\$$/g, ''); // Keep standard replacements clean
-            out += `#m("${escapeLatex(rawTex)}")`;
+            out += `#m("${escapeLatex(rawTex)}");`;
             return;
           }
           if (tag !== 'img') {
@@ -655,7 +657,7 @@
           }
           if (latex) {
             const rawTex = latex.replace(/^\$\$\$|^\$\$|^\$|\$\$\$|\$\$|\$$/g, '');
-            out += `#dm("${escapeLatex(rawTex)}")`;
+            out += `#dm("${escapeLatex(rawTex)}");`;
             return;
           }
           if (tag !== 'img') {
@@ -736,9 +738,9 @@
       result += escapeMarkup(plainText);
       const latex = match[1] !== undefined ? match[1] : match[2];
       if (match[1] !== undefined || latex.includes('\\\\')) {
-        result += `#dm("${escapeLatex(latex)}")`;
+        result += `#dm("${escapeLatex(latex)}");`;
       } else {
-        result += `#m("${escapeLatex(latex)}")`;
+        result += `#m("${escapeLatex(latex)}");`;
       }
       lastIndex = cfMathRegex.lastIndex;
     }
@@ -748,7 +750,7 @@
 
   function escapeString(str) {
     if (!str) return "";
-    return str.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/#/g, "\\#");
+    return str.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   }
 
   function escapeMarkup(str) {
@@ -764,7 +766,31 @@
   }
 
   function getContestTitle() {
-    return document.querySelector('.contest-name a')?.textContent.trim() || document.title || "Codeforces Contest";
+    let title = document.querySelector('.contest-name a')?.textContent.trim() 
+      || document.querySelector('.contest-name')?.textContent.trim()
+      || document.title 
+      || "Codeforces Contest";
+    
+    // Clean up dashboard and site prefixes/suffixes
+    title = title
+      .replace(/^Dashboard\s*-\s*/i, "")
+      .replace(/\s*-\s*Codeforces$/i, "")
+      .replace(/^Problems\s*-\s*/i, "")
+      .replace(/^Contest\s*-\s*/i, "");
+      
+    return title.trim();
+  }
+
+  function getContestLocation() {
+    // Try to find the group name if it exists on the page
+    const groupName = document.querySelector('table.rtable a[href*="/group/"]')?.textContent.trim();
+    if (groupName) return groupName;
+    return "Codeforces";
+  }
+
+  function getContestFilename(title, ext) {
+    const clean = title.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+    return `${clean || 'contest'}.${ext}`;
   }
 
   function downloadFile(filename, content, mimeType) {
@@ -881,13 +907,14 @@
       });
       
       // Write End of Central Directory
+      const cdSize = pos - cdOffset;
       view.setUint32(pos, 0x06054b50, true); pos += 4; // EOCD signature
       view.setUint16(pos, 0, true); pos += 2;          // Disk number
       view.setUint16(pos, 0, true); pos += 2;          // CD disk start
       view.setUint16(pos, preparedFiles.length, true); pos += 2; // CD disk records
       view.setUint16(pos, preparedFiles.length, true); pos += 2; // CD total records
-      view.setUint32(pos, cdOffset - localHeadersSize, true); pos += 4; // CD size
-      view.setUint32(pos, localHeadersSize, true); pos += 4; // CD offset
+      view.setUint32(pos, cdSize, true); pos += 4;     // CD size
+      view.setUint32(pos, cdOffset, true); pos += 4;   // CD offset
       view.setUint16(pos, 0, true); pos += 2;          // Comment length
       
       return out;

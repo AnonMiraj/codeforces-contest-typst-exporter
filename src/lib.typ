@@ -1,4 +1,4 @@
-#import "@preview/mitex:0.2.5": *
+#import "@preview/mitex:0.2.7": *
 
 #let problem-counter = counter("problem")
 
